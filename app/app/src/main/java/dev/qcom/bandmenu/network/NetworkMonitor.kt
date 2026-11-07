@@ -51,6 +51,8 @@ class NetworkMonitor(
         val diagEnabled: Boolean = false,
         /** Why DIAG stopped or a round's DIAG read failed, if it did. */
         val diagError: String? = null,
+        /** Latest bounded LTE RRC OTA sample from DCI, for the diagnostic panel. */
+        val diagLteRrcInfo: String? = null,
         /** Replay on: polls and records every round, also in the background. */
         val replayEnabled: Boolean = false,
         /** Combined DL throughput of each SIM's recent DIAG rounds, oldest
@@ -204,7 +206,7 @@ class NetworkMonitor(
                 if (withDiag) {
                     _state.update {
                         val diagOn = it.diagEnabled && !r.diagFailed
-                        it.copy(diagEnabled = diagOn, diagError = r.diagError)
+                        it.copy(diagEnabled = diagOn, diagError = r.diagError, diagLteRrcInfo = r.lteRrcInfo)
                     }
                 }
             }
@@ -220,12 +222,14 @@ class NetworkMonitor(
                         it.copy(
                             error = "Service information read failed (${NetworkReads.SYS})",
                             diagEnabled = diagOn,
-                            diagError = if (withDiag) r.diagError else it.diagError
+                            diagError = if (withDiag) r.diagError else it.diagError,
+                            diagLteRrcInfo = if (withDiag) r.lteRrcInfo else it.diagLteRrcInfo
                         )
                     } else {
                         it.copy(snapshot = r.snapshot, operatorName = r.name, error = null,
                             lastBySim = it.lastBySim + (sim to Reading(r.snapshot, r.name)),
-                            diagEnabled = diagOn, diagError = if (withDiag) r.diagError else it.diagError)
+                            diagEnabled = diagOn, diagError = if (withDiag) r.diagError else it.diagError,
+                            diagLteRrcInfo = if (withDiag) r.lteRrcInfo else it.diagLteRrcInfo)
                     }
                 }
             },
@@ -234,7 +238,7 @@ class NetworkMonitor(
     }
 
     private class RoundResult(val snapshot: NetworkSnapshot, val name: String?, val diagError: String?, val diagFailed: Boolean,
-        val mbps: Double? = null, val ulMbps: Double? = null)
+        val mbps: Double? = null, val ulMbps: Double? = null, val lteRrcInfo: String? = null)
 
     private fun readRound(sim: Int, fresh: Boolean, withDiag: Boolean): Result<RoundResult> = runCatching {
         if (!daemon.isReady.value && !daemon.hasConnectedOnce) throw IllegalStateException("Waiting for the daemon…")
@@ -250,6 +254,15 @@ class NetworkMonitor(
                 null
             }
         } else null
+        val lteRrcInfo = diagStats?.let { d ->
+            if (d.lteRrcCount == 0L) {
+                "No LTE RRC OTA (0xB0C0) packets received through DCI yet."
+            } else {
+                val hexLines = d.lteRrcLastHex.orEmpty().chunked(2).chunked(32).joinToString("\\n") { it.joinToString(" ") }
+                "Packets received: ${d.lteRrcCount}\\nLast payload length: ${d.lteRrcLastLength ?: 0} bytes\\n" +
+                    "Payload sample (first 256 bytes):\\n" + hexLines
+            }
+        }
         val snap = pucchHold[sim - 1].apply(portHold[sim - 1].apply(SnapshotBuilder(reads, nrHardwareBands, diagStats, diagMode = withDiag)
             .build(sim, SystemClock.elapsedRealtime(), (SystemClock.elapsedRealtime() - t0).toInt())))
         // Slow tier: operator name only when the PLMN changes.
@@ -265,7 +278,7 @@ class NetworkMonitor(
             it.append(elapsed, ReplayFormat.encode(sim, elapsed, snap.roundMs, name, nrHardwareBands,
                 NetworkReads.ROUND, rawReads, if (diagStats != null) diag.lastStatsJson else null))
         }
-        RoundResult(snap, name, diagError, withDiag && diagStats == null, diagStats?.totalMbps, diagStats?.totalUlMbps)
+        RoundResult(snap, name, diagError, withDiag && diagStats == null, diagStats?.totalMbps, diagStats?.totalUlMbps, lteRrcInfo)
     }
 
     /** The recording of [sim] so far, for the replay while frozen. Blocking. */

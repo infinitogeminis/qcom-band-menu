@@ -709,6 +709,12 @@ private fun NetworkContent(
         Column(Modifier.scrollAnchor(anchor, groupKey)) { CarrierSection(g, title = !servingHidden, phyUl = !uplinkShown) }
     }
     state.diagError?.let { NoticeCard(if (state.diagEnabled) stringResource(R.string.net_diag_read_failed, it) else stringResource(R.string.net_diag_stopped, it)) }
+    if (state.diagEnabled) state.diagLteRrcInfo?.let { info ->
+        Expandable("LTE RRC OTA (0xB0C0)") {
+            Text(info, modifier = Modifier.fillMaxWidth(), style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        }
+    }
     // DIAG only: QMI has no throughput (hidden on WCDMA).
     if (state.diagEnabled && thput.isNotEmpty() && snap.mode != ServiceMode.WCDMA) {
         Column(Modifier.scrollAnchor(anchor, "${p}thput")) {
