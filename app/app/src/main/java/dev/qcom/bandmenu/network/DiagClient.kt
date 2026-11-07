@@ -331,6 +331,26 @@ class DiagClient(private val context: Context) {
             val diagLog = mutableListOf<String>()
             Shell.cmd("logcat -d -v threadtime -t 500 -s Diag_Lib:E").to(diagLog).exec()
             val diagDetails = diagLog.joinToString("\n").trim().takeLast(12000)
+            // Snapshot the actual access boundary: device nodes, related sockets,
+            // daemon processes, SELinux mode and DIAG-related vendor properties.
+            // This distinguishes a missing endpoint from a permission/socket failure.
+            val diagEnvironment = mutableListOf<String>()
+            val environmentCommand = """
+                echo '--- identity ---'
+                id
+                cat /proc/self/attr/current 2>&1
+                getenforce 2>&1
+                echo '--- DIAG/QMI device nodes and sockets ---'
+                for p in /dev/diag* /dev/socket/*diag* /dev/socket/*qmi*; do
+                    [ -e "\$p" ] && ls -lZ "\$p"
+                done
+                echo '--- DIAG/QMI processes ---'
+                ps -AZ | grep -iE '[d]iag|[q]mi'
+                echo '--- DIAG properties ---'
+                getprop | grep -iE 'diag|dci'
+            """.trimIndent()
+            Shell.cmd(environmentCommand).to(diagEnvironment).exec()
+            val environmentDetails = diagEnvironment.joinToString("\n").trim().takeLast(12000)
             val message = buildString {
                 append(helperErr)
                 if (diagDetails.isNotEmpty()) {
@@ -338,6 +358,12 @@ class DiagClient(private val context: Context) {
                     append(diagDetails)
                 } else {
                     append("\n\nNo Diag_Lib error entries were returned by logcat.")
+                }
+                if (environmentDetails.isNotEmpty()) {
+                    append("\n\nDIAG environment snapshot:\n")
+                    append(environmentDetails)
+                } else {
+                    append("\n\nDIAG environment snapshot: no output.")
                 }
             }
             throw IOException(message)
