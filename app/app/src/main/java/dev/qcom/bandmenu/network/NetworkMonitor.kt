@@ -409,8 +409,28 @@ class NetworkMonitor(
         if (result != 0) return "GET_ENDC_CONFIG: modem rejected request (result=$result, error=$error)\nRaw QMI response: $rx"
         val summary = "GET_ENDC_CONFIG: EN-DC enabled=${enabled?.toString() ?: "not reported"}; " +
             "Immediate SCG release=${immediateScgRelease?.toString() ?: "not reported"}"
-        AppLog.i(TAG, "$summary; raw=$rx")
-        return "$summary\nRaw QMI response: $rx"
+
+        // GET_SYS_INFO is the modem's live per-serving-cell view. In particular,
+        // TLV 0x4E reports EN-DC availability and TLV 0x4F reports DCNR restriction.
+        // This distinguishes the global modem setting above from what the modem
+        // currently reports for the LTE cell, without relying on Android dumpsys.
+        val sysItem = requestRaw(sim, listOf(NetworkReads.SYS)).getJSONObject(0)
+        val sysStatus = sysItem.optString("status", "unknown")
+        val sysHex = sysItem.optString("rx").orEmpty()
+        val sysSummary = if (sysStatus != "ok" || sysHex.isEmpty()) {
+            "GET_SYS_INFO: transport $sysStatus"
+        } else {
+            runCatching {
+                val sysFrame = QmiFrame.parseHex(sysHex)
+                if (sysFrame.messageId != 0x004D) throw QmiFormatException("unexpected message ID")
+                val info = decodeSysInfo(sysFrame)
+                val lte = info.status[Rat.LTE]?.status?.let(NasServiceStatus::label) ?: "not reported"
+                "GET_SYS_INFO: LTE service=$lte; EN-DC available=${info.endcAvailable?.toString() ?: "not reported"}; " +
+                    "DCNR restricted=${info.dcnrRestricted?.toString() ?: "not reported"}"
+            }.getOrElse { "GET_SYS_INFO: decode error: ${it.message}" }
+        }
+        AppLog.i(TAG, "$summary; $sysSummary; endcRaw=$rx; sysRaw=$sysHex")
+        return "$summary\n$sysSummary\nRaw QMI GET_ENDC_CONFIG: $rx\nRaw QMI GET_SYS_INFO: $sysHex"
     }
 
     companion object {
