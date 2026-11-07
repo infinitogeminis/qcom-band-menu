@@ -1,5 +1,8 @@
 package dev.qcom.bandmenu.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 
 import androidx.compose.ui.res.stringResource
@@ -39,6 +42,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
@@ -111,6 +115,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.mutableIntStateOf
 import dev.qcom.bandmenu.network.TrafficTest
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.DropdownEntry
@@ -196,6 +201,9 @@ fun NetworkScreen(
     val statusHeight by animateDpAsState(if (status.isNotEmpty()) statusLineHeight else 0.dp, label = "testStatus")
     val topBarHeight = topBarInset + TopAppBarDefaults.CollapsedHeight + statusHeight
     var showTestSetup by remember { mutableStateOf(false) }
+    // Keep the complete one-shot QMI result on screen until the user closes it.
+    var endcResult by remember { mutableStateOf<String?>(null) }
+    var endcResultSim by remember { mutableIntStateOf(1) }
 
     // Replay of the recorded rounds while frozen: the slider picks the sample
     // shown in place of the live reading; unfreezing drops it.
@@ -486,6 +494,54 @@ fun NetworkScreen(
             onDismiss = { showTestSetup = false },
             onSave = { test.save(it); showTestSetup = false }
         )
+        endcResult?.let { resultText ->
+            Dialog(onDismissRequest = { endcResult = null }) {
+                Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "EN-DC diagnostic result — SIM $endcResultSim",
+                            style = MiuixTheme.textStyles.body1,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState())
+                                .background(MiuixTheme.colorScheme.onBackground.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(resultText, style = MiuixTheme.textStyles.body2)
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "COPY",
+                                modifier = Modifier.clickable {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("EN-DC QMI result", resultText))
+                                    Toast.makeText(context, "Full result copied", Toast.LENGTH_SHORT).show()
+                                }.padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = MiuixTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "CLOSE",
+                                modifier = Modifier.clickable { endcResult = null }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                color = MiuixTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
         // Padlock (freeze), then the menu.
         Row(
             modifier = Modifier.align(Alignment.TopEnd).padding(top = topBarInset + 8.dp, end = 8.dp),
@@ -521,13 +577,15 @@ fun NetworkScreen(
                         DropdownItem(
                             text = "Read EN-DC config (QMI)",
                             onClick = {
+                                endcResultSim = activeSim
+                                endcResult = "Reading QMI NAS GET_ENDC_CONFIG (0x00E8)…"
                                 replayScope.launch {
                                     val message = try {
                                         withContext(Dispatchers.IO) { monitor.readEndcConfig(activeSim) }
                                     } catch (e: Exception) {
                                         "GET_ENDC_CONFIG failed: ${e.message ?: e.javaClass.simpleName}"
                                     }
-                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                    endcResult = "SIM $activeSim\n$message"
                                 }
                             }
                         ),
