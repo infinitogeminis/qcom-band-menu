@@ -342,7 +342,8 @@ class DiagClient(private val context: Context) {
                 getenforce 2>&1
                 echo '--- DIAG/QMI device nodes and sockets ---'
                 for p in /dev/diag* /dev/socket/*diag* /dev/socket/*qmi*; do
-                    [ -e "${'
+                    find /dev -maxdepth 1 -name 'diag*' -exec ls -lZ {} \\; 2>&1
+                    find /dev/socket -maxdepth 1 \\( -name '*diag*' -o -name '*qmi*' \\) -exec ls -lZ {} \\; 2>&1
                 echo '--- DIAG/QMI processes ---'
                 ps -AZ | grep -iE '[d]iag|[q]mi'
                 echo '--- DIAG properties ---'
