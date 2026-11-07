@@ -1508,7 +1508,7 @@ private fun CarrierAntennaRows(a: AntennaGroup, header: Boolean = true) = BoxWit
 }
 
 @Composable
-private fun DiagErrorCard(error: String, title: String) {
+private fun DiagErrorCard(reportText: String, title: String) {
     val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -1522,7 +1522,7 @@ private fun DiagErrorCard(error: String, title: String) {
                     "Скопировать отчёт",
                     modifier = Modifier.clickable {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("QBM DIAG report", error))
+                        clipboard.setPrimaryClip(ClipData.newPlainText("QBM DIAG report", reportText))
                         Toast.makeText(context, "DIAG-отчёт скопирован", Toast.LENGTH_SHORT).show()
                     },
                     style = MiuixTheme.textStyles.body2,
@@ -1539,11 +1539,11 @@ private fun DiagErrorCard(error: String, title: String) {
                             }
                             val uri = context.contentResolver.insert(
                                 android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-                            ) ?: error("Не удалось создать файл в Downloads")
+                            ) ?: reportText("Не удалось создать файл в Downloads")
                             try {
                                 context.contentResolver.openOutputStream(uri)?.use {
-                                    it.write(error.toByteArray(Charsets.UTF_8))
-                                } ?: error("Не удалось открыть файл для записи")
+                                    it.write(reportText.toByteArray(Charsets.UTF_8))
+                                } ?: reportText("Не удалось открыть файл для записи")
                             } catch (e: Exception) {
                                 context.contentResolver.delete(uri, null, null)
                                 throw e
