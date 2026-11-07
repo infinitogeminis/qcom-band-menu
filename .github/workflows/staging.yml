@@ -4,14 +4,15 @@ name: Staging build
 # every push to main, diag-test or cell-lock-rework that touches the app.
 on:
   push:
-    branches: [main, diag-test, cell-lock-rework]
+    branches: [main, diag-test, cell-lock-rework, diagnostic/get-endc-config-00e8]
     paths:
       - 'app/**'
       - '.github/workflows/staging.yml'
   workflow_dispatch:
 
 concurrency:
-  group: staging-${{ github.ref }}
+  group: qbm-endc-diagnostic
+  # Only one diagnostic staging build may run at a time.
   cancel-in-progress: true
 
 jobs:
@@ -87,6 +88,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
+
+      - name: Build read-only QMI NAS daemon
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+          clang --target=aarch64-linux-gnu -fuse-ld=lld -O2 -nostdlib -static \
+            -fno-stack-protector -fno-builtin -Wl,-e,_start \
+            -Wl,--build-id=none -o /tmp/qcom-bandlockd app/binary/qcom-bandlockd_v5-0-0.c
+          file /tmp/qcom-bandlockd
+          readelf -h /tmp/qcom-bandlockd | grep -E 'Class:|Machine:|Type:'
+          install -m 0755 /tmp/qcom-bandlockd app/app/src/main/assets/qcom-bandlockd
 
       - name: Build staging APK
         working-directory: app
