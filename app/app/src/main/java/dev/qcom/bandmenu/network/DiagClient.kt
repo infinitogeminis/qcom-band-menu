@@ -319,8 +319,11 @@ class DiagClient(private val context: Context) {
         if (waitConnect(12)) return
         // The helper ran and reported its own failure: not a connection problem.
         // (libdiag's "diag: ..." trace lines can land here from a healthy helper.)
-        val helperErr = if (err.exists()) err.readLines().filterNot { it.startsWith("diag:") }
-            .joinToString("\n").trim() else ""
+        // If startup failed, retain libdiag's own diag-prefixed trace lines too:
+        // they often contain the actual reason Diag_LSM_Init returned false
+        // (for example, /dev/diag open or DCI service initialization).
+        // Filtering them here erased the only useful failure diagnostics.
+        val helperErr = if (err.exists()) err.readText().trim() else ""
         if (helperErr.isNotEmpty()) throw IOException(helperErr)
         // KernelSU keeps the capabilities a root process started with: after
         // the app's root profile changes, the app's persistent root shell can
