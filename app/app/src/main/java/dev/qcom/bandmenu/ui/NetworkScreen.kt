@@ -1539,11 +1539,11 @@ private fun DiagErrorCard(reportText: String, title: String) {
                             }
                             val uri = context.contentResolver.insert(
                                 android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
-                            ) ?: reportText("Не удалось создать файл в Downloads")
+                            ) ?: throw IllegalStateException("Не удалось создать файл в Downloads")
                             try {
                                 context.contentResolver.openOutputStream(uri)?.use {
                                     it.write(reportText.toByteArray(Charsets.UTF_8))
-                                } ?: reportText("Не удалось открыть файл для записи")
+                                } ?: throw IllegalStateException("Не удалось открыть файл для записи")
                             } catch (e: Exception) {
                                 context.contentResolver.delete(uri, null, null)
                                 throw e
