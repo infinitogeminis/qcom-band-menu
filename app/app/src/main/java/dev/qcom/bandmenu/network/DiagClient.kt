@@ -112,7 +112,8 @@ data class DiagStats(val windowMs: Long, val carriers: List<DiagCarrier>, val nr
     val lteTimingAdvance: Int? = null, val nrTimingAdvance: Int? = null,
     /** NR neighbour beams, strongest RSRP first (the serving beams left out);
      *  null when the helper sent no list (no NR measurement lately). */
-    val nrNeighbours: List<DiagNrNeighbour>? = null) {
+    val nrNeighbours: List<DiagNrNeighbour>? = null,
+    val lteRrcCount: Long = 0, val lteRrcLastLength: Int? = null, val lteRrcLastHex: String? = null) {
     /** Combined PHY downlink throughput: every LTE and NR carrier. */
     val totalMbps: Double get() = carriers.sumOf { it.mbps } + nr.sumOf { it.mbps }
 
@@ -187,7 +188,10 @@ data class DiagStats(val windowMs: Long, val carriers: List<DiagCarrier>, val nr
                         val e = a.getJSONArray(k)
                         DiagNrNeighbour(e.getLong(0), e.getInt(1), e.getInt(2), e.getDouble(3), e.getDouble(4))
                     }
-                })
+                },
+                lteRrcCount = o.optLong("lte_rrc_count"),
+                lteRrcLastLength = if (o.has("lte_rrc_last_len")) o.optInt("lte_rrc_last_len") else null,
+                lteRrcLastHex = o.optString("lte_rrc_last_hex").takeIf { it.isNotEmpty() })
         }
 
         /** Combined DL and UL throughput from [o] without decoding full carrier lists. */
@@ -226,7 +230,7 @@ class DiagClient(private val context: Context) {
         private const val TAG = "DiagClient"
         private const val BINARY_NAME = "qbm-diagd"
         private const val SOCKET_NAME = "qbm_diagd"
-        private const val EXPECTED_VERSION = "1.22.34"
+        private const val EXPECTED_VERSION = "1.22.35"
     }
 
     private var socket: LocalSocket? = null
