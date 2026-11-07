@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: qbm-endc-diagnostic
+  group: qbm-endc-diagnostic-retry-8278c831
   # Only one diagnostic staging build may run at a time.
   cancel-in-progress: true
 
