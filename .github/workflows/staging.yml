@@ -8,6 +8,11 @@ on:
     paths:
       - 'app/**'
       - '.github/workflows/staging.yml'
+  pull_request:
+    branches: [diagnostic/get-endc-config-00e8]
+    paths:
+      - 'app/**'
+      - '.github/workflows/staging.yml'
   workflow_dispatch:
 
 concurrency:
