@@ -14,7 +14,7 @@ object RootSocketRule {
     /** SELinux domains root processes run in: "su" on KernelSU, "magisk" on
      *  Magisk (Magisk 26 on the OnePlus Nord: the "su" rule is accepted but
      *  doesn't apply). */
-    private val ROOT_DOMAINS = listOf("su", "magisk")
+    private val ROOT_DOMAINS = listOf("ksu", "su", "magisk")
 
     /** True if a policy tool accepted the rule for at least one domain. */
     fun allow(tag: String): Boolean {

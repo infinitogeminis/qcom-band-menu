@@ -112,7 +112,8 @@ data class DiagStats(val windowMs: Long, val carriers: List<DiagCarrier>, val nr
     val lteTimingAdvance: Int? = null, val nrTimingAdvance: Int? = null,
     /** NR neighbour beams, strongest RSRP first (the serving beams left out);
      *  null when the helper sent no list (no NR measurement lately). */
-    val nrNeighbours: List<DiagNrNeighbour>? = null) {
+    val nrNeighbours: List<DiagNrNeighbour>? = null,
+    val lteRrcCount: Long = 0, val lteRrcLastLength: Int? = null, val lteRrcLastHex: String? = null) {
     /** Combined PHY downlink throughput: every LTE and NR carrier. */
     val totalMbps: Double get() = carriers.sumOf { it.mbps } + nr.sumOf { it.mbps }
 
@@ -187,7 +188,10 @@ data class DiagStats(val windowMs: Long, val carriers: List<DiagCarrier>, val nr
                         val e = a.getJSONArray(k)
                         DiagNrNeighbour(e.getLong(0), e.getInt(1), e.getInt(2), e.getDouble(3), e.getDouble(4))
                     }
-                })
+                },
+                lteRrcCount = o.optLong("lte_rrc_count"),
+                lteRrcLastLength = if (o.has("lte_rrc_last_len")) o.optInt("lte_rrc_last_len") else null,
+                lteRrcLastHex = o.optString("lte_rrc_last_hex").takeIf { it.isNotEmpty() })
         }
 
         /** Combined DL and UL throughput from [o] without decoding full carrier lists. */
@@ -226,7 +230,7 @@ class DiagClient(private val context: Context) {
         private const val TAG = "DiagClient"
         private const val BINARY_NAME = "qbm-diagd"
         private const val SOCKET_NAME = "qbm_diagd"
-        private const val EXPECTED_VERSION = "1.22.34"
+        private const val EXPECTED_VERSION = "1.22.35"
     }
 
     private var socket: LocalSocket? = null
@@ -315,9 +319,57 @@ class DiagClient(private val context: Context) {
         if (waitConnect(12)) return
         // The helper ran and reported its own failure: not a connection problem.
         // (libdiag's "diag: ..." trace lines can land here from a healthy helper.)
-        val helperErr = if (err.exists()) err.readLines().filterNot { it.startsWith("diag:") }
-            .joinToString("\n").trim() else ""
-        if (helperErr.isNotEmpty()) throw IOException(helperErr)
+        // If startup failed, retain libdiag's own diag-prefixed trace lines too:
+        // they often contain the actual reason Diag_LSM_Init returned false
+        // (for example, /dev/diag open or DCI service initialization).
+        // Filtering them here erased the only useful failure diagnostics.
+        val helperErr = if (err.exists()) err.readText().trim() else ""
+        if (helperErr.isNotEmpty()) {
+            // Qualcomm libdiag reports the internal Diag_LSM_Init failure reason
+            // through Android log tag Diag_Lib, not necessarily helper stderr.
+            // Capture it before returning the generic helper error.
+            val diagLog = mutableListOf<String>()
+            Shell.cmd("logcat -d -v threadtime -t 500 -s Diag_Lib:E").to(diagLog).exec()
+            val diagDetails = diagLog.joinToString("\n").trim().takeLast(12000)
+            // Snapshot the actual access boundary: device nodes, related sockets,
+            // daemon processes, SELinux mode and DIAG-related vendor properties.
+            // This distinguishes a missing endpoint from a permission/socket failure.
+            val diagEnvironment = mutableListOf<String>()
+            val environmentCommand = """
+                echo '--- identity ---'
+                id
+                cat /proc/self/attr/current 2>&1
+                getenforce 2>&1
+                echo '--- DIAG/QMI device nodes and sockets ---'
+                find /dev -maxdepth 4 \\( -iname '*diag*' -o -iname '*dci*' \\) -exec ls -lZ {} \\; 2>&1
+                find /sys -maxdepth 5 \\( -iname '*diag*' -o -iname '*dci*' \\) -print 2>&1 | head -200
+                echo '--- DIAG/QMI processes ---'
+                ps -AZ | grep -iE '[d]iag|[q]mi'
+                echo '--- SELinux AVC denials ---'
+                logcat -b all -d -v threadtime -t 1500 2>&1 | grep -iE 'avc: denied|type=1400|diag.*denied|denied.*diag' | tail -120
+                dmesg 2>&1 | grep -iE 'avc: denied|diag.*denied|denied.*diag' | tail -80
+                echo '--- DIAG properties ---'
+                getprop | grep -iE 'diag|dci'
+            """.trimIndent()
+            Shell.cmd(environmentCommand).to(diagEnvironment).exec()
+            val environmentDetails = diagEnvironment.joinToString("\n").trim().takeLast(12000)
+            val message = buildString {
+                append(helperErr)
+                if (diagDetails.isNotEmpty()) {
+                    append("\n\nQualcomm Diag_Lib logcat:\n")
+                    append(diagDetails)
+                } else {
+                    append("\n\nNo Diag_Lib error entries were returned by logcat.")
+                }
+                if (environmentDetails.isNotEmpty()) {
+                    append("\n\nDIAG environment snapshot:\n")
+                    append(environmentDetails)
+                } else {
+                    append("\n\nDIAG environment snapshot: no output.")
+                }
+            }
+            throw IOException(message)
+        }
         // KernelSU keeps the capabilities a root process started with: after
         // the app's root profile changes, the app's persistent root shell can
         // be uid 0 with none, unable to reach the app's files (Xperia 1 IV).

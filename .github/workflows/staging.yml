@@ -4,7 +4,7 @@ name: Staging build
 # every push to main, diag-test or cell-lock-rework that touches the app.
 on:
   push:
-    branches: [main, diag-test, cell-lock-rework, diagnostic/get-endc-config-00e8]
+    branches: [main, diag-test, cell-lock-rework, diagnostic/get-endc-config-00e8, diagnostic/lte-rrc-b0c0-probe]
     paths:
       - 'app/**'
       - '.github/workflows/staging.yml'
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: qbm-endc-diagnostic
+  group: qbm-endc-diagnostic-retry-8278c831
   # Only one diagnostic staging build may run at a time.
   cancel-in-progress: false
 
@@ -105,6 +105,18 @@ jobs:
           readelf -h /tmp/qcom-bandlockd | grep -E 'Class:|Machine:|Type:'
           install -m 0755 /tmp/qcom-bandlockd app/app/src/main/assets/qcom-bandlockd
 
+      - name: Build DCI diagnostic helper
+        run: |
+          sdkmanager --install "ndk;27.2.12479018"
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          "$CC" -O2 -fPIE -pie -fno-stack-protector -Wall -Wextra -D_timezone=timezone \
+            -o /tmp/qbm-diagd app/binary/qbm-diagd.c app/binary/rrc_csi.c app/binary/rrc_nr_gen.c -ldl -lm
+          file /tmp/qbm-diagd
+          readelf -h /tmp/qbm-diagd | grep -E 'Class:|Machine:|Type:'
+          readelf -d /tmp/qbm-diagd | grep NEEDED
+          install -m 0755 /tmp/qbm-diagd app/app/src/main/assets/qbm-diagd
+
       - name: Build staging APK
         working-directory: app
         run: ./gradlew :app:assembleStaging
@@ -141,3 +153,5 @@ jobs:
       - name: Run unit tests
         working-directory: app
         run: ./gradlew :app:testDebugUnitTest
+
+# Re-trigger staging build for the latest DIAG diagnostics.

@@ -708,7 +708,19 @@ private fun NetworkContent(
         val groupKey = if (g.title == "NR aggregation") "${p}nr" else "${p}lte"
         Column(Modifier.scrollAnchor(anchor, groupKey)) { CarrierSection(g, title = !servingHidden, phyUl = !uplinkShown) }
     }
-    state.diagError?.let { NoticeCard(if (state.diagEnabled) stringResource(R.string.net_diag_read_failed, it) else stringResource(R.string.net_diag_stopped, it)) }
+    state.diagError?.let { error ->
+        DiagErrorCard(
+            reportText = error,
+            title = if (state.diagEnabled) stringResource(R.string.net_diag_read_failed, error)
+                else stringResource(R.string.net_diag_stopped, error)
+        )
+    }
+    if (state.diagEnabled) state.diagLteRrcInfo?.let { info ->
+        Expandable("LTE RRC OTA (0xB0C0)") {
+            Text(info, modifier = Modifier.fillMaxWidth(), style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        }
+    }
     // DIAG only: QMI has no throughput (hidden on WCDMA).
     if (state.diagEnabled && thput.isNotEmpty() && snap.mode != ServiceMode.WCDMA) {
         Column(Modifier.scrollAnchor(anchor, "${p}thput")) {
@@ -1490,6 +1502,61 @@ private fun CarrierAntennaRows(a: AntennaGroup, header: Boolean = true) = BoxWit
             val v = values(c)
             row("RX${c.chain}") { k ->
                 CellValueBar(v[k], kinds[k], barMax, a.rat, style, trackWhenEmpty = true, gradientFill = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagErrorCard(reportText: String, title: String) {
+    val context = LocalContext.current
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(title, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Скопировать отчёт",
+                    modifier = Modifier.clickable {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("QBM DIAG report", reportText))
+                        Toast.makeText(context, "DIAG-отчёт скопирован", Toast.LENGTH_SHORT).show()
+                    },
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.primary
+                )
+                Text(
+                    "Сохранить TXT",
+                    modifier = Modifier.clickable {
+                        runCatching {
+                            val values = android.content.ContentValues().apply {
+                                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "QBM-DIAG-${System.currentTimeMillis()}.txt")
+                                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+                            }
+                            val uri = context.contentResolver.insert(
+                                android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+                            ) ?: throw IllegalStateException("Не удалось создать файл в Downloads")
+                            try {
+                                context.contentResolver.openOutputStream(uri)?.use {
+                                    it.write(reportText.toByteArray(Charsets.UTF_8))
+                                } ?: throw IllegalStateException("Не удалось открыть файл для записи")
+                            } catch (e: Exception) {
+                                context.contentResolver.delete(uri, null, null)
+                                throw e
+                            }
+                        }.onSuccess {
+                            Toast.makeText(context, "Отчёт сохранён в Downloads", Toast.LENGTH_LONG).show()
+                        }.onFailure {
+                            Toast.makeText(context, "Ошибка сохранения: ${it.message}", Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.primary
+                )
             }
         }
     }

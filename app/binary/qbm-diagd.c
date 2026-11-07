@@ -72,7 +72,7 @@
 #include "qbm_layouts.h"   /* generated per-version layouts */
 #include "rrc_csi.h"       /* CSI-RS ports from RRC reconfigurations */
 
-#define HELPER_VERSION "1.22.34"
+#define HELPER_VERSION "1.22.35"
 #define SOCKET_NAME "qbm_diagd"
 #define WATCHDOG_MS 15000             /* app polls every ~1 s; tolerates stalls */
 #define DIAG_PROC_MSM 0
@@ -95,8 +95,8 @@ typedef int (*remote_dev_t)(uint16_t *);
 static uint16_t CODES[] = { 0xB173, 0xB126, 0xB139, 0xB184, 0xB193, 0xB168, 0xB179, 0xB16E, 0xB16D, /* LTE */
                             0xB883, 0xB887, 0xB97F, 0xB8D8, 0xB8A7, 0xB825, 0xB823, 0xB88A, 0xB884, /* NR */
                             0xB8DD, 0xB96A,                             /* NR, X65 */
-                            0xB821 };                                   /* NR RRC */
-#define NCODES 21
+                            0xB821, 0xB0C0 };                           /* NR RRC, LTE RRC OTA */
+#define NCODES 22
 
 /* ── Per-carrier window (reset on every "stats") ─────────────────────────── */
 
@@ -144,6 +144,9 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 #define SIMS 2
 static int sim = 0;
 static int sim_tags = 0;               /* the extended header was granted */
+static unsigned long lte_rrc_count_s[SIMS];
+static int lte_rrc_last_len_s[SIMS];
+static char lte_rrc_last_hex_s[SIMS][513];
 
 static struct slot win_s[SIMS][SLOTS];
 #define win (win_s[sim])
@@ -1738,7 +1741,15 @@ static void on_log_from(int src, unsigned char *ptr, int len) {
     rrc_csi_select(sim);
     last_log_ms = now_ms();
     n_logs++;
-    if (code == 0xB173) b173(pl, pn);
+    if (code == 0xB0C0) {
+        lte_rrc_count_s[sim]++;
+        int keep = pn < 256 ? pn : 256;
+        lte_rrc_last_len_s[sim] = pn;
+        for (int i = 0; i < keep; i++)
+            snprintf(&lte_rrc_last_hex_s[sim][i * 2], 3, "%02X", pl[i]);
+        lte_rrc_last_hex_s[sim][keep * 2] = '\0';
+    }
+    else if (code == 0xB173) b173(pl, pn);
     else if (code == 0xB126) b126(pl, pn);
     else if (code == 0xB139) b139(pl, pn);
     else if (code == 0xB16E) b16e(pl, pn);
@@ -2117,6 +2128,8 @@ static int write_stats(char *out, size_t cap, int for_sim) {
     /* The last random access's TA, as the raw index. */
     if (!silent && show_lte_ta) PUT(",\"lte_ta\":%d", lte_ta.value);
     if (!silent && show_nr_ta) PUT(",\"nr_ta\":%d", nr_ta.value);
+    PUT(",\"lte_rrc_count\":%lu,\"lte_rrc_last_len\":%d,\"lte_rrc_last_hex\":\"%s\"",
+        lte_rrc_count_s[sim], lte_rrc_last_len_s[sim], lte_rrc_last_hex_s[sim]);
     PUT("}\n");
 #undef PUT
     /* Every SIM's window restarts: the next answer for either SIM covers the
@@ -2234,7 +2247,25 @@ int main(int argc, char **argv) {
     SYM(reg_stream_t, diag_register_dci_stream_proc);
     SYM(log_cfg_t, diag_log_stream_config);
 
-    if (!Diag_LSM_Init(NULL)) { fprintf(stderr, "Diag_LSM_Init failed\n"); return 1; }
+    errno = 0;
+    int lsm_ok = Diag_LSM_Init(NULL);
+    int lsm_errno = errno;
+    if (!lsm_ok) {
+        fprintf(stderr, "Diag_LSM_Init failed: errno=%d (%s), libdiag=%s, pid=%d, uid=%d, euid=%d\n",
+                lsm_errno, lsm_errno ? strerror(lsm_errno) : "not set", lib_route,
+                getpid(), getuid(), geteuid());
+        const char *nodes[] = { "/dev/diag", "/dev/diag_mdm", "/dev/diag_qsc",
+                                "/dev/socket/diag", "/dev/socket/diag_router",
+                                "/dev/socket/diag_mdlog", "/dev/socket/diag_lsm", NULL };
+        for (int i = 0; nodes[i]; i++) {
+            errno = 0;
+            int exists = access(nodes[i], F_OK);
+            int e = errno;
+            fprintf(stderr, "DIAG endpoint %s: %s", nodes[i], exists == 0 ? "present\n" : "missing");
+            if (exists != 0) fprintf(stderr, "  access errno=%d (%s)\n", e, strerror(e));
+        }
+        return 1;
+    }
     int client = 0, sig = SIGCONT;
     uint16_t periph = DIAG_CON_MPSS;
     int r = diag_register_dci_client(&client, &periph, DIAG_PROC_MSM, &sig);
@@ -2364,3 +2395,5 @@ int main(int argc, char **argv) {
     close(lfd);
     return 0;
 }
+
+/* CI rebuild trigger: verify latest DIAG diagnostics. */
