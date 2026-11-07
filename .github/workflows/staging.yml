@@ -148,3 +148,5 @@ jobs:
       - name: Run unit tests
         working-directory: app
         run: ./gradlew :app:testDebugUnitTest
+
+# Re-trigger staging build for the latest DIAG diagnostics.
