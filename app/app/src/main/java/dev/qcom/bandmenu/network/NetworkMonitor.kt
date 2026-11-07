@@ -356,6 +356,51 @@ class NetworkMonitor(
         return arr
     }
 
+    /**
+     * One-shot, read-only QMI NAS GET_ENDC_CONFIG (0x00E8).
+     * This reports the modem's global EN-DC enable flag; it is not a
+     * per-cell SIB2/upperLayerIndication query.
+     */
+    fun readEndcConfig(sim: Int): String {
+        val item = requestRaw(sim, listOf("00E8")).getJSONObject(0)
+        val status = item.optString("status", "unknown")
+        val rx = item.optString("rx").orEmpty()
+        if (status != "ok" || rx.length < 14) {
+            return "GET_ENDC_CONFIG: $status" + if (rx.isNotEmpty()) " (rx=$rx)" else ""
+        }
+        val bytes = try { rx.chunked(2).map { it.toInt(16) } } catch (_: Exception) {
+            return "GET_ENDC_CONFIG: malformed response hex ($rx)"
+        }
+        if (bytes[0] != 2 || bytes[3] != 0xE8 || bytes[4] != 0) {
+            return "GET_ENDC_CONFIG: unexpected QMI frame ($rx)"
+        }
+        var pos = 7
+        var result: Int? = null
+        var error: Int? = null
+        var enabled: Boolean? = null
+        var immediateScgRelease: Boolean? = null
+        while (pos + 3 <= bytes.size) {
+            val type = bytes[pos]
+            val length = bytes[pos + 1] or (bytes[pos + 2] shl 8)
+            pos += 3
+            if (pos + length > bytes.size) break
+            when (type) {
+                0x02 -> if (length >= 4) {
+                    result = bytes[pos] or (bytes[pos + 1] shl 8)
+                    error = bytes[pos + 2] or (bytes[pos + 3] shl 8)
+                }
+                0x10 -> if (length >= 1) enabled = bytes[pos] != 0
+                0x11 -> if (length >= 1) immediateScgRelease = bytes[pos] != 0
+            }
+            pos += length
+        }
+        val summary = "GET_ENDC_CONFIG: QMI result=${result ?: "?"}, error=${error ?: "?"}; " +
+            "EN-DC enabled=${enabled?.toString() ?: "not reported"}; " +
+            "Immediate SCG release=${immediateScgRelease?.toString() ?: "not reported"}"
+        AppLog.i(TAG, "$summary; raw=$rx")
+        return summary
+    }
+
     companion object {
         /** [setVisible] owners: the Network page and the Cell-Lock Live view. */
         const val OWNER_NETWORK = "network"
