@@ -926,6 +926,7 @@ static int nas_read_allowed(u16 msg){
   case 0x004D: /* GET_SYS_INFO */
   case 0x004F: /* GET_SIG_INFO */
   case 0x0052: /* GET_ERR_RATE */
+  case 0x00E8: /* GET_ENDC_CONFIG: read-only global EN-DC configuration */
   case 0x00AC: /* GET_LTE_CPHY_CA_INFO */
   case 0x00D2: /* GET_ARFCN_LIST */
   case 0x0148: /* GET_PHY_CHANNEL_INFO */
