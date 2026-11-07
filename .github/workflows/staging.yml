@@ -4,7 +4,7 @@ name: Staging build
 # every push to main, diag-test or cell-lock-rework that touches the app.
 on:
   push:
-    branches: [main, diag-test, cell-lock-rework, diagnostic/get-endc-config-00e8]
+    branches: [main, diag-test, cell-lock-rework, diagnostic/get-endc-config-00e8, diagnostic/lte-rrc-b0c0-probe]
     paths:
       - 'app/**'
       - '.github/workflows/staging.yml'
