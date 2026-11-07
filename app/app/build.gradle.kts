@@ -41,9 +41,9 @@ android {
         // (own package and label) and is signed with the local debug key.
         create("staging") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".staging"
+            applicationIdSuffix = ".endcdiag"
             versionNameSuffix = "-staging"
-            manifestPlaceholders["appLabel"] = "QBM Staging"
+            manifestPlaceholders["appLabel"] = "QBM EN-DC Diagnostic"
             signingConfig = signingConfigs.getByName("debug")
             isProfileable = true
             matchingFallbacks += listOf("release")
