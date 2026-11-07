@@ -710,7 +710,7 @@ private fun NetworkContent(
     }
     state.diagError?.let { error ->
         DiagErrorCard(
-            error = error,
+            reportText = error,
             title = if (state.diagEnabled) stringResource(R.string.net_diag_read_failed, error)
                 else stringResource(R.string.net_diag_stopped, error)
         )
