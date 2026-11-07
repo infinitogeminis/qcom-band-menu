@@ -258,9 +258,9 @@ class NetworkMonitor(
             if (d.lteRrcCount == 0L) {
                 "No LTE RRC OTA (0xB0C0) packets received through DCI yet."
             } else {
-                val hexLines = d.lteRrcLastHex.orEmpty().chunked(2).chunked(32).joinToString("\\n") { it.joinToString(" ") }
-                "Packets received: ${d.lteRrcCount}\\nLast payload length: ${d.lteRrcLastLength ?: 0} bytes\\n" +
-                    "Payload sample (first 256 bytes):\\n" + hexLines
+                val hexLines = d.lteRrcLastHex.orEmpty().chunked(2).chunked(32).joinToString("\n") { it.joinToString(" ") }
+                "Packets received: ${d.lteRrcCount}\nLast payload length: ${d.lteRrcLastLength ?: 0} bytes\n" +
+                    "Payload sample (first 256 bytes):\n" + hexLines
             }
         }
         val snap = pucchHold[sim - 1].apply(portHold[sim - 1].apply(SnapshotBuilder(reads, nrHardwareBands, diagStats, diagMode = withDiag)
