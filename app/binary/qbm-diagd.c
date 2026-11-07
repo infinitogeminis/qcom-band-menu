@@ -2247,7 +2247,25 @@ int main(int argc, char **argv) {
     SYM(reg_stream_t, diag_register_dci_stream_proc);
     SYM(log_cfg_t, diag_log_stream_config);
 
-    if (!Diag_LSM_Init(NULL)) { fprintf(stderr, "Diag_LSM_Init failed\n"); return 1; }
+    errno = 0;
+    int lsm_ok = Diag_LSM_Init(NULL);
+    int lsm_errno = errno;
+    if (!lsm_ok) {
+        fprintf(stderr, "Diag_LSM_Init failed: errno=%d (%s), libdiag=%s, pid=%d, uid=%d, euid=%d\\n",
+                lsm_errno, lsm_errno ? strerror(lsm_errno) : "not set", lib_route,
+                getpid(), getuid(), geteuid());
+        const char *nodes[] = { "/dev/diag", "/dev/diag_mdm", "/dev/diag_qsc",
+                                "/dev/socket/diag", "/dev/socket/diag_router",
+                                "/dev/socket/diag_mdlog", "/dev/socket/diag_lsm", NULL };
+        for (int i = 0; nodes[i]; i++) {
+            errno = 0;
+            int exists = access(nodes[i], F_OK);
+            int e = errno;
+            fprintf(stderr, "DIAG endpoint %s: %s", nodes[i], exists == 0 ? "present\\n" : "missing");
+            if (exists != 0) fprintf(stderr, "  access errno=%d (%s)\\n", e, strerror(e));
+        }
+        return 1;
+    }
     int client = 0, sig = SIGCONT;
     uint16_t periph = DIAG_CON_MPSS;
     int r = diag_register_dci_client(&client, &periph, DIAG_PROC_MSM, &sig);
