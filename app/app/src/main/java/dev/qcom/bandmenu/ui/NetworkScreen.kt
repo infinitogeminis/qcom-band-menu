@@ -1,5 +1,7 @@
 package dev.qcom.bandmenu.ui
 
+import android.widget.Toast
+
 import androidx.compose.ui.res.stringResource
 import dev.qcom.bandmenu.AppTheme
 import dev.qcom.bandmenu.R
@@ -516,6 +518,19 @@ fun NetworkScreen(
                             onClick = { onReplayToggle(!state.replayEnabled) }
                         ),
                         DropdownItem(text = stringResource(R.string.test_title), onClick = { showTestSetup = true }),
+                        DropdownItem(
+                            text = "Read EN-DC config (QMI)",
+                            onClick = {
+                                replayScope.launch {
+                                    val message = try {
+                                        withContext(Dispatchers.IO) { monitor.readEndcConfig(activeSim) }
+                                    } catch (e: Exception) {
+                                        "GET_ENDC_CONFIG failed: ${e.message ?: e.javaClass.simpleName}"
+                                    }
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        ),
                         DropdownItem(
                             text = stringResource(R.string.net_keep_screen_on), selected = keepScreenOn,
                             onClick = { onKeepScreenOnToggle(!keepScreenOn) }
