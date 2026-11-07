@@ -366,7 +366,8 @@ class NetworkMonitor(
         val status = item.optString("status", "unknown")
         val rx = item.optString("rx").orEmpty()
         if (status != "ok") {
-            return "GET_ENDC_CONFIG: transport $status" + if (rx.isNotEmpty()) " (rx=$rx)" else ""
+            return "GET_ENDC_CONFIG: transport $status" +
+                if (rx.isNotEmpty()) "\nRaw QMI response: $rx" else ""
         }
         if (rx.length < 14 || rx.length % 2 != 0 || !rx.matches(Regex("(?:[0-9A-Fa-f]{2})+"))) {
             return "GET_ENDC_CONFIG: malformed response hex ($rx)"
@@ -405,11 +406,11 @@ class NetworkMonitor(
             pos += length
         }
         if (result == null || error == null) return "GET_ENDC_CONFIG: QMI result TLV missing ($rx)"
-        if (result != 0) return "GET_ENDC_CONFIG: modem rejected request (result=$result, error=$error)"
+        if (result != 0) return "GET_ENDC_CONFIG: modem rejected request (result=$result, error=$error)\nRaw QMI response: $rx"
         val summary = "GET_ENDC_CONFIG: EN-DC enabled=${enabled?.toString() ?: "not reported"}; " +
             "Immediate SCG release=${immediateScgRelease?.toString() ?: "not reported"}"
         AppLog.i(TAG, "$summary; raw=$rx")
-        return summary
+        return "$summary\nRaw QMI response: $rx"
     }
 
     companion object {
