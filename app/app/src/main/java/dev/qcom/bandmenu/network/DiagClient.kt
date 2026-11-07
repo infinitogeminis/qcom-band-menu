@@ -324,7 +324,24 @@ class DiagClient(private val context: Context) {
         // (for example, /dev/diag open or DCI service initialization).
         // Filtering them here erased the only useful failure diagnostics.
         val helperErr = if (err.exists()) err.readText().trim() else ""
-        if (helperErr.isNotEmpty()) throw IOException(helperErr)
+        if (helperErr.isNotEmpty()) {
+            // Qualcomm libdiag reports the internal Diag_LSM_Init failure reason
+            // through Android log tag Diag_Lib, not necessarily helper stderr.
+            // Capture it before returning the generic helper error.
+            val diagLog = mutableListOf<String>()
+            Shell.cmd("logcat -d -v threadtime -t 500 -s Diag_Lib:E").to(diagLog).exec()
+            val diagDetails = diagLog.joinToString("\n").trim().takeLast(12000)
+            val message = buildString {
+                append(helperErr)
+                if (diagDetails.isNotEmpty()) {
+                    append("\n\nQualcomm Diag_Lib logcat:\n")
+                    append(diagDetails)
+                } else {
+                    append("\n\nNo Diag_Lib error entries were returned by logcat.")
+                }
+            }
+            throw IOException(message)
+        }
         // KernelSU keeps the capabilities a root process started with: after
         // the app's root profile changes, the app's persistent root shell can
         // be uid 0 with none, unable to reach the app's files (Xperia 1 IV).
