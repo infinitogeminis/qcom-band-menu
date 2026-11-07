@@ -105,7 +105,7 @@ jobs:
           sdkmanager --install "ndk;27.2.12479018"
           NDK="$ANDROID_HOME/ndk/27.2.12479018"
           CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
-          "$CC" -O2 -fPIE -pie -fno-stack-protector -Wall -Wextra \
+          "$CC" -O2 -fPIE -pie -fno-stack-protector -Wall -Wextra -D_timezone=timezone \
             -o /tmp/qbm-diagd app/binary/qbm-diagd.c app/binary/rrc_csi.c app/binary/rrc_nr_gen.c -ldl -lm
           file /tmp/qbm-diagd
           readelf -h /tmp/qbm-diagd | grep -E 'Class:|Machine:|Type:'
