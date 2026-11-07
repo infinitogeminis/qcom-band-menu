@@ -2395,3 +2395,5 @@ int main(int argc, char **argv) {
     close(lfd);
     return 0;
 }
+
+/* CI rebuild trigger: verify latest DIAG diagnostics. */
