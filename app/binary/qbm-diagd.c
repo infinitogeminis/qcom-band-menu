@@ -2251,7 +2251,7 @@ int main(int argc, char **argv) {
     int lsm_ok = Diag_LSM_Init(NULL);
     int lsm_errno = errno;
     if (!lsm_ok) {
-        fprintf(stderr, "Diag_LSM_Init failed: errno=%d (%s), libdiag=%s, pid=%d, uid=%d, euid=%d\\n",
+        fprintf(stderr, "Diag_LSM_Init failed: errno=%d (%s), libdiag=%s, pid=%d, uid=%d, euid=%d\n",
                 lsm_errno, lsm_errno ? strerror(lsm_errno) : "not set", lib_route,
                 getpid(), getuid(), geteuid());
         const char *nodes[] = { "/dev/diag", "/dev/diag_mdm", "/dev/diag_qsc",
@@ -2261,8 +2261,8 @@ int main(int argc, char **argv) {
             errno = 0;
             int exists = access(nodes[i], F_OK);
             int e = errno;
-            fprintf(stderr, "DIAG endpoint %s: %s", nodes[i], exists == 0 ? "present\\n" : "missing");
-            if (exists != 0) fprintf(stderr, "  access errno=%d (%s)\\n", e, strerror(e));
+            fprintf(stderr, "DIAG endpoint %s: %s", nodes[i], exists == 0 ? "present\n" : "missing");
+            if (exists != 0) fprintf(stderr, "  access errno=%d (%s)\n", e, strerror(e));
         }
         return 1;
     }
