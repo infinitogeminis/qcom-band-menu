@@ -341,10 +341,13 @@ class DiagClient(private val context: Context) {
                 cat /proc/self/attr/current 2>&1
                 getenforce 2>&1
                 echo '--- DIAG/QMI device nodes and sockets ---'
-                find /dev -maxdepth 1 -name 'diag*' -exec ls -lZ {} \; 2>&1
-                find /dev/socket -maxdepth 1 \( -name '*diag*' -o -name '*qmi*' \) -exec ls -lZ {} \; 2>&1
+                find /dev -maxdepth 4 \\( -iname '*diag*' -o -iname '*dci*' \\) -exec ls -lZ {} \\; 2>&1
+                find /sys -maxdepth 5 \\( -iname '*diag*' -o -iname '*dci*' \\) -print 2>&1 | head -200
                 echo '--- DIAG/QMI processes ---'
                 ps -AZ | grep -iE '[d]iag|[q]mi'
+                echo '--- SELinux AVC denials ---'
+                logcat -b all -d -v threadtime -t 1500 2>&1 | grep -iE 'avc: denied|type=1400|diag.*denied|denied.*diag' | tail -120
+                dmesg 2>&1 | grep -iE 'avc: denied|diag.*denied|denied.*diag' | tail -80
                 echo '--- DIAG properties ---'
                 getprop | grep -iE 'diag|dci'
             """.trimIndent()
