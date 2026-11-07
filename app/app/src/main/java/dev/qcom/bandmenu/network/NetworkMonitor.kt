@@ -365,13 +365,15 @@ class NetworkMonitor(
         val item = requestRaw(sim, listOf("00E8")).getJSONObject(0)
         val status = item.optString("status", "unknown")
         val rx = item.optString("rx").orEmpty()
-        if (status != "ok" || rx.length < 14) {
-            return "GET_ENDC_CONFIG: $status" + if (rx.isNotEmpty()) " (rx=$rx)" else ""
+        if (status != "ok") {
+            return "GET_ENDC_CONFIG: transport $status" + if (rx.isNotEmpty()) " (rx=$rx)" else ""
         }
-        val bytes = try { rx.chunked(2).map { it.toInt(16) } } catch (_: Exception) {
+        if (rx.length < 14 || rx.length % 2 != 0 || !rx.matches(Regex("(?:[0-9A-Fa-f]{2})+"))) {
             return "GET_ENDC_CONFIG: malformed response hex ($rx)"
         }
-        if (bytes[0] != 2 || bytes[3] != 0xE8 || bytes[4] != 0) {
+        val bytes = rx.chunked(2).map { it.toInt(16) }
+        val bodyLength = bytes[5] or (bytes[6] shl 8)
+        if (bytes[0] != 2 || bytes[3] != 0xE8 || bytes[4] != 0 || bodyLength != bytes.size - 7) {
             return "GET_ENDC_CONFIG: unexpected QMI frame ($rx)"
         }
         var pos = 7
@@ -379,23 +381,32 @@ class NetworkMonitor(
         var error: Int? = null
         var enabled: Boolean? = null
         var immediateScgRelease: Boolean? = null
-        while (pos + 3 <= bytes.size) {
+        while (pos < bytes.size) {
+            if (pos + 3 > bytes.size) return "GET_ENDC_CONFIG: truncated TLV header ($rx)"
             val type = bytes[pos]
             val length = bytes[pos + 1] or (bytes[pos + 2] shl 8)
             pos += 3
-            if (pos + length > bytes.size) break
+            if (pos + length > bytes.size) return "GET_ENDC_CONFIG: truncated TLV value ($rx)"
             when (type) {
-                0x02 -> if (length >= 4) {
+                0x02 -> {
+                    if (length != 4) return "GET_ENDC_CONFIG: invalid result TLV length ($length)"
                     result = bytes[pos] or (bytes[pos + 1] shl 8)
                     error = bytes[pos + 2] or (bytes[pos + 3] shl 8)
                 }
-                0x10 -> if (length >= 1) enabled = bytes[pos] != 0
-                0x11 -> if (length >= 1) immediateScgRelease = bytes[pos] != 0
+                0x10 -> {
+                    if (length != 1 || bytes[pos] !in 0..1) return "GET_ENDC_CONFIG: invalid Enabled TLV"
+                    enabled = bytes[pos] != 0
+                }
+                0x11 -> {
+                    if (length != 1 || bytes[pos] !in 0..1) return "GET_ENDC_CONFIG: invalid Immediate SCG Release TLV"
+                    immediateScgRelease = bytes[pos] != 0
+                }
             }
             pos += length
         }
-        val summary = "GET_ENDC_CONFIG: QMI result=${result ?: "?"}, error=${error ?: "?"}; " +
-            "EN-DC enabled=${enabled?.toString() ?: "not reported"}; " +
+        if (result == null || error == null) return "GET_ENDC_CONFIG: QMI result TLV missing ($rx)"
+        if (result != 0) return "GET_ENDC_CONFIG: modem rejected request (result=$result, error=$error)"
+        val summary = "GET_ENDC_CONFIG: EN-DC enabled=${enabled?.toString() ?: "not reported"}; " +
             "Immediate SCG release=${immediateScgRelease?.toString() ?: "not reported"}"
         AppLog.i(TAG, "$summary; raw=$rx")
         return summary
