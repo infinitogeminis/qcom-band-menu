@@ -72,6 +72,48 @@ class TelephonyProbe(context: Context) {
     }
 
 
+    /**
+     * Synchronous Android-side snapshot included in the copyable diagnostic report.
+     * Logcat callbacks are useful during development but are not part of the user's
+     * exported QMI report, so collect the current public TelephonyManager state here.
+     */
+    fun snapshotText(): String {
+        val elapsed = SystemClock.elapsedRealtime()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return "ANDROID_TELEPHONY elapsedMs=$elapsed unavailable=requires_API_30"
+        }
+        if (appContext.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return "ANDROID_TELEPHONY elapsedMs=$elapsed unavailable=READ_PHONE_STATE_not_granted"
+        }
+        return try {
+            val subscriptionManager = appContext.getSystemService(SubscriptionManager::class.java)
+            val subscriptions = subscriptionManager.activeSubscriptionInfoList.orEmpty()
+                .sortedBy { it.simSlotIndex }
+            val lines = mutableListOf(
+                "ANDROID_TELEPHONY elapsedMs=$elapsed activeSubscriptions=${subscriptions.size} defaultDataSubId=${SubscriptionManager.getDefaultDataSubscriptionId()}"
+            )
+            if (subscriptions.isEmpty()) {
+                lines += "ANDROID_TELEPHONY no_active_subscriptions"
+            }
+            subscriptions.forEach { sub ->
+                val subId = sub.subscriptionId
+                val tm = appContext.getSystemService(TelephonyManager::class.java)
+                    .createForSubscriptionId(subId)
+                val networkType = runCatching { tm.networkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
+                val dataNetworkType = runCatching { tm.dataNetworkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
+                val operator = runCatching { tm.networkOperator }.getOrNull() ?: "unavailable"
+                val displayInfo = runCatching { tm.telephonyDisplayInfo.toString() }
+                    .getOrElse { "unavailable:${it.javaClass.simpleName}:${it.message}" }
+                val serviceState = runCatching { tm.serviceState?.toString() ?: "null" }
+                    .getOrElse { "unavailable:${it.javaClass.simpleName}:${it.message}" }
+                lines += "ANDROID_SIM slot=${sub.simSlotIndex} subId=$subId carrier=${sub.carrierName} operator=$operator networkType=$networkType dataNetworkType=$dataNetworkType displayInfo=$displayInfo serviceState=$serviceState"
+            }
+            lines.joinToString("\n")
+        } catch (e: Exception) {
+            "ANDROID_TELEPHONY elapsedMs=$elapsed snapshot_error=${e.javaClass.simpleName}:${e.message}"
+        }
+    }
+
     /** Log QMI's view beside Android's asynchronous telephony callbacks. */
     fun logQmiRound(sim: Int, snapshot: dev.qcom.bandmenu.network.NetworkSnapshot, sysInfo: SysInfo?) {
         val nrCells = snapshot.cells.filter { it.rat == dev.qcom.bandmenu.network.Rat.NR }
