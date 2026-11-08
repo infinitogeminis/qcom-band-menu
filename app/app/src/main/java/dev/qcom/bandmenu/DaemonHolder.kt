@@ -19,7 +19,7 @@ import kotlinx.coroutines.sync.Mutex
  * state survive instead of being reset and re-initialized.
  * Cleared only when the activity really finishes.
  */
-class DaemonHolder(val daemonManager: DaemonManager, diagClient: DiagClient, replayDir: File) : ViewModel() {
+class DaemonHolder(val daemonManager: DaemonManager, diagClient: DiagClient, replayDir: File, appContext: android.content.Context) : ViewModel() {
     val scope: CoroutineScope get() = viewModelScope
 
     /** Serializes multi-request modem sequences (SIM select + commands). Lives
@@ -27,8 +27,11 @@ class DaemonHolder(val daemonManager: DaemonManager, diagClient: DiagClient, rep
      *  destroyed activity and the new activity's init can never interleave. */
     val modemLock = Mutex()
 
+    /** Android telephony view, correlated with each QMI network round. */
+    val telephonyProbe = TelephonyProbe(appContext)
+
     /** Network page poller; here so a configuration change keeps one poller. */
-    val networkMonitor = NetworkMonitor(daemonManager, diagClient, viewModelScope, ReplayRecorder(replayDir))
+    val networkMonitor = NetworkMonitor(daemonManager, diagClient, viewModelScope, ReplayRecorder(replayDir), telephonyProbe)
 
     val modemState = mutableStateOf<ModemState?>(null)
     val isLoading = mutableStateOf(true)
