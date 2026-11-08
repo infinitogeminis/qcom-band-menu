@@ -116,7 +116,7 @@ class TelephonyProbe(context: Context) {
                 val carrierConfig = runCatching {
                     val manager = appContext.getSystemService(CarrierConfigManager::class.java)
                     val bundle = manager?.getConfigForSubId(subId)
-                    bundle?.getString(CarrierConfigManager.KEY_5G_ICON_CONFIGURATION_STRING)
+                    bundle?.getString("5g_icon_configuration_string")
                         ?.let { "5g_icon_configuration_string=${it.replace("\n", " ")}" }
                         ?: "5g_icon_configuration_string=not_set_or_unavailable"
                 }.getOrElse { "carrier_config_error=${it.javaClass.simpleName}:${it.message}" }
