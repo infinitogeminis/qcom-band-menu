@@ -7,6 +7,7 @@ import android.widget.Toast
 
 import androidx.compose.ui.res.stringResource
 import dev.qcom.bandmenu.AppTheme
+import dev.qcom.bandmenu.TelephonyProbe
 import dev.qcom.bandmenu.R
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.pager.HorizontalPager
@@ -143,6 +144,7 @@ import java.util.Locale
 @Composable
 fun NetworkScreen(
     monitor: NetworkMonitor,
+    telephonyProbe: TelephonyProbe,
     /** True while the pager is settled on this page. */
     isActive: Boolean,
     simLabels: List<String> = listOf("SIM 1", "SIM 2"),
@@ -580,12 +582,22 @@ fun NetworkScreen(
                                 endcResultSim = activeSim
                                 endcResult = "Reading QMI NAS GET_ENDC_CONFIG (0x00E8)…"
                                 replayScope.launch {
-                                    val message = try {
+                                    val androidSnapshot = telephonyProbe.snapshotText()
+                                    val qmiMessage = try {
                                         withContext(Dispatchers.IO) { monitor.readEndcConfig(activeSim) }
                                     } catch (e: Exception) {
                                         "GET_ENDC_CONFIG failed: ${e.message ?: e.javaClass.simpleName}"
                                     }
-                                    endcResult = "SIM $activeSim\n$message"
+                                    endcResult = buildString {
+                                        appendLine("QBM 5G STATUS REPORT v7.0.1")
+                                        appendLine("SIM $activeSim")
+                                        appendLine()
+                                        appendLine("=== ANDROID TELEPHONY / DISPLAY / SERVICE / CARRIER CONFIG ===")
+                                        appendLine(androidSnapshot.ifBlank { "ANDROID_TELEPHONY unavailable: empty snapshot" })
+                                        appendLine()
+                                        appendLine("=== QUALCOMM QMI GET_ENDC_CONFIG ===")
+                                        append(qmiMessage)
+                                    }
                                 }
                             }
                         ),
