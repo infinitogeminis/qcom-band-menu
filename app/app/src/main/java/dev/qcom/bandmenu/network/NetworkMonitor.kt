@@ -442,12 +442,23 @@ class NetworkMonitor(
                 if (sysFrame.messageId != 0x004D) throw QmiFormatException("unexpected message ID")
                 val info = decodeSysInfo(sysFrame)
                 val lte = info.status[Rat.LTE]?.status?.let(NasServiceStatus::label) ?: "not reported"
-                "GET_SYS_INFO: LTE service=$lte; EN-DC available=${info.endcAvailable?.toString() ?: "not reported"}; " +
+                val nr = info.status[Rat.NR]?.status?.let(NasServiceStatus::label) ?: "not reported"
+                "GET_SYS_INFO: LTE service=$lte; NR service=$nr; EN-DC available=${info.endcAvailable?.toString() ?: "not reported"}; " +
                     "DCNR restricted=${info.dcnrRestricted?.toString() ?: "not reported"}"
             }.getOrElse { "GET_SYS_INFO: decode error: ${it.message}" }
         }
-        AppLog.i(TAG, "$summary; $sysSummary; endcRaw=$rx; sysRaw=$sysHex")
-        return "$summary\n$sysSummary\nRaw QMI GET_ENDC_CONFIG: $rx\nRaw QMI GET_SYS_INFO: $sysHex"
+        val qmiRound = if (sysStatus != "ok" || sysHex.isEmpty()) {
+            "QMI_ROUND: unavailable (GET_SYS_INFO transport $sysStatus)"
+        } else {
+            runCatching {
+                val info = decodeSysInfo(QmiFrame.parseHex(sysHex))
+                val statuses = info.status.entries.joinToString(";") { "${it.key}=${it.value.status}/${it.value.trueStatus}" }
+                "QMI_ROUND sim=$sim elapsedMs=${SystemClock.elapsedRealtime()} RAT_status=$statuses ENDC_available=${info.endcAvailable} DCNR_restricted=${info.dcnrRestricted} NR_ARFCN=${info.nrArfcn} NR_PCI=${info.nrPci} NR_NCI=${info.nrNci}"
+            }.getOrElse { "QMI_ROUND: decode error: ${it.message}" }
+        }
+        val androidSnapshot = telephonyProbe?.snapshotText() ?: "ANDROID_TELEPHONY: probe unavailable"
+        AppLog.i(TAG, "$summary; $sysSummary; $qmiRound; endcRaw=$rx; sysRaw=$sysHex")
+        return "$androidSnapshot\n$summary\n$sysSummary\n$qmiRound\nRaw QMI GET_ENDC_CONFIG: $rx\nRaw QMI GET_SYS_INFO: $sysHex"
     }
 
     companion object {
