@@ -34,7 +34,8 @@ class NetworkMonitor(
     private val daemon: DaemonManager,
     private val diag: DiagClient,
     private val scope: CoroutineScope,
-    private val recorder: ReplayRecorder? = null
+    private val recorder: ReplayRecorder? = null,
+    private val telephonyProbe: TelephonyProbe? = null
 ) {
     data class State(
         val sim: Int = 1,
@@ -265,6 +266,7 @@ class NetworkMonitor(
         }
         val snap = pucchHold[sim - 1].apply(portHold[sim - 1].apply(SnapshotBuilder(reads, nrHardwareBands, diagStats, diagMode = withDiag)
             .build(sim, SystemClock.elapsedRealtime(), (SystemClock.elapsedRealtime() - t0).toInt())))
+        telephonyProbe?.logQmiRound(sim, snap)
         // Slow tier: operator name only when the PLMN changes.
         val plmn = snap.plmn
         val key = plmn?.let { "$it/${snap.mode}" }
