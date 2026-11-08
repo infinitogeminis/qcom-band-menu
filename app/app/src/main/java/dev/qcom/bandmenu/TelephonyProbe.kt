@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.SystemClock
+import android.telephony.CarrierConfigManager
 import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyDisplayInfo
@@ -106,15 +107,25 @@ class TelephonyProbe(context: Context) {
                 val networkType = runCatching { tm.networkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
                 val dataNetworkType = runCatching { tm.dataNetworkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
                 val operator = runCatching { tm.networkOperator }.getOrNull() ?: "unavailable"
+                val operatorName = runCatching { tm.networkOperatorName }.getOrNull() ?: "unavailable"
+                val voiceNetworkType = runCatching { tm.voiceNetworkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
+                val dataEnabled = runCatching { tm.isDataEnabled.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
                 val displayInfo = synchronized(lock) {
                     displayInfoBySubId[subId] ?: "callback_not_received_yet"
                 }
+                val carrierConfig = runCatching {
+                    val manager = appContext.getSystemService(CarrierConfigManager::class.java)
+                    val bundle = manager?.getConfigForSubId(subId)
+                    bundle?.getString(CarrierConfigManager.KEY_5G_ICON_CONFIGURATION_STRING)
+                        ?.let { "5g_icon_configuration_string=${it.replace("\n", " ")}" }
+                        ?: "5g_icon_configuration_string=not_set_or_unavailable"
+                }.getOrElse { "carrier_config_error=${it.javaClass.simpleName}:${it.message}" }
                 val serviceState = runCatching { tm.serviceState?.toString() ?: "null" }
                     .getOrElse { "unavailable:${it.javaClass.simpleName}:${it.message}" }
                 val callbackServiceState = synchronized(lock) {
                     serviceStateBySubId[subId] ?: "callback_not_received_yet"
                 }
-                lines += "ANDROID_SIM slot=${sub.simSlotIndex} subId=$subId carrier=${sub.carrierName} operator=$operator networkType=$networkType dataNetworkType=$dataNetworkType displayInfoCallback={$displayInfo} serviceState=$serviceState serviceStateCallback={$callbackServiceState}"
+                lines += "ANDROID_SIM slot=${sub.simSlotIndex} subId=$subId carrier=${sub.carrierName} operator=$operator operatorName=$operatorName networkType=$networkType dataNetworkType=$dataNetworkType voiceNetworkType=$voiceNetworkType dataEnabled=$dataEnabled displayInfoCallback={$displayInfo} serviceState=$serviceState serviceStateCallback={$callbackServiceState} $carrierConfig"
             }
             lines.joinToString("\n")
         } catch (e: Exception) {
