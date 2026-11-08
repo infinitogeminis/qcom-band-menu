@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
         })[DaemonHolder::class.java]
     }
     private val daemonManager get() = daemonHolder.daemonManager
+    private val telephonyProbe by lazy { TelephonyProbe(applicationContext) }
 
     /** Transparent bars with icons that suit the theme: dark icons on the
      *  light theme, light ones on the dark (whatever the phone's own mode). */
@@ -209,6 +210,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+                val phoneStatePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                    if (granted) telephonyProbe.start()
+                    else AppLog.w("QBM-Telephony", "READ_PHONE_STATE denied; Android NR telemetry unavailable")
+                }
+                LaunchedEffect(Unit) {
+                    if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                        telephonyProbe.start()
+                    } else {
+                        phoneStatePermission.launch(Manifest.permission.READ_PHONE_STATE)
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     BandPreferences.getServingHidden(bandDataStore).collectLatest { hidden ->
@@ -1362,6 +1375,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        telephonyProbe.stop()
         // Closing the app ends the poller, so replay's background service too.
         if (isFinishing) ReplayService.stop(applicationContext)
         super.onDestroy()
