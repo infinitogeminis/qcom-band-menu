@@ -21,6 +21,8 @@ import dev.qcom.bandmenu.network.SysInfo
 class TelephonyProbe(context: Context) {
     private val appContext = context.applicationContext
     private val callbacks = linkedMapOf<Int, Pair<TelephonyManager, TelephonyCallback>>()
+    private val displayInfoBySubId = mutableMapOf<Int, String>()
+    private val serviceStateBySubId = mutableMapOf<Int, String>()
     private val lock = Any()
 
     fun start() {
@@ -53,10 +55,12 @@ class TelephonyProbe(context: Context) {
                         TelephonyCallback.DisplayInfoListener,
                         TelephonyCallback.ServiceStateListener {
                         override fun onDisplayInfoChanged(info: TelephonyDisplayInfo) {
+                            synchronized(lock) { displayInfoBySubId[subId] = "networkType=${info.networkType}(${ratName(info.networkType)}) overrideNetworkType=${info.overrideNetworkType}(${overrideName(info.overrideNetworkType)}) details=$info" }
                             AppLog.i(TAG, "DISPLAY elapsedMs=${SystemClock.elapsedRealtime()} slot=$slot subId=$subId networkType=${info.networkType}(${ratName(info.networkType)}) overrideNetworkType=${info.overrideNetworkType}(${overrideName(info.overrideNetworkType)}) displayInfo=$info")
                         }
 
                         override fun onServiceStateChanged(serviceState: android.telephony.ServiceState) {
+                            synchronized(lock) { serviceStateBySubId[subId] = serviceState.toString() }
                             AppLog.i(TAG, "SERVICE elapsedMs=${SystemClock.elapsedRealtime()} slot=$slot subId=$subId state=${serviceState.state} roaming=${serviceState.roaming} details=$serviceState")
                         }
                     }
@@ -102,11 +106,15 @@ class TelephonyProbe(context: Context) {
                 val networkType = runCatching { tm.networkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
                 val dataNetworkType = runCatching { tm.dataNetworkType.toString() }.getOrElse { "error:${it.javaClass.simpleName}" }
                 val operator = runCatching { tm.networkOperator }.getOrNull() ?: "unavailable"
-                val displayInfo = runCatching { tm.telephonyDisplayInfo.toString() }
-                    .getOrElse { "unavailable:${it.javaClass.simpleName}:${it.message}" }
+                val displayInfo = synchronized(lock) {
+                    displayInfoBySubId[subId] ?: "callback_not_received_yet"
+                }
                 val serviceState = runCatching { tm.serviceState?.toString() ?: "null" }
                     .getOrElse { "unavailable:${it.javaClass.simpleName}:${it.message}" }
-                lines += "ANDROID_SIM slot=${sub.simSlotIndex} subId=$subId carrier=${sub.carrierName} operator=$operator networkType=$networkType dataNetworkType=$dataNetworkType displayInfo=$displayInfo serviceState=$serviceState"
+                val callbackServiceState = synchronized(lock) {
+                    serviceStateBySubId[subId] ?: "callback_not_received_yet"
+                }
+                lines += "ANDROID_SIM slot=${sub.simSlotIndex} subId=$subId carrier=${sub.carrierName} operator=$operator networkType=$networkType dataNetworkType=$dataNetworkType displayInfoCallback={$displayInfo} serviceState=$serviceState serviceStateCallback={$callbackServiceState}"
             }
             lines.joinToString("\n")
         } catch (e: Exception) {
