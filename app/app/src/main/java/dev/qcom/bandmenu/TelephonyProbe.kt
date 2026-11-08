@@ -70,6 +70,16 @@ class TelephonyProbe(context: Context) {
         }
     }
 
+
+    /** Log QMI's view beside Android's asynchronous telephony callbacks. */
+    fun logQmiRound(sim: Int, snapshot: dev.qcom.bandmenu.network.NetworkSnapshot) {
+        val nrCells = snapshot.cells.filter { it.rat == dev.qcom.bandmenu.network.Rat.NR }
+            .joinToString(";") { cell -> "${cell.title}[${cell.fields.joinToString(",") { "${it.label}=${it.value}" }}]" }
+            .ifEmpty { "none" }
+        val rrc = snapshot.rrc.joinToString(";") { "${it.label}=${it.value}" }.ifEmpty { "none" }
+        AppLog.i(TAG, "QMI_ROUND elapsedMs=${SystemClock.elapsedRealtime()} sim=$sim mode=${snapshot.mode} modeLabel=${snapshot.modeLabel} NR_cells=$nrCells RRC=$rrc roundMs=${snapshot.roundMs}")
+    }
+
     fun stop() {
         synchronized(lock) {
             callbacks.values.forEach { (tm, callback) ->
