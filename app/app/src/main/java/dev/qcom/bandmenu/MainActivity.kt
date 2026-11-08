@@ -532,6 +532,7 @@ class MainActivity : ComponentActivity() {
 
                 MainScreen(
                     networkMonitor = daemonHolder.networkMonitor,
+                    telephonyProbe = telephonyProbe,
                     onNetworkRefresh = { recheckSim2() },
                     servingHidden = servingHidden,
                     thputHidden = thputHidden,
