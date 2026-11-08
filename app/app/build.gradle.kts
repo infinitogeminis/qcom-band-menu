@@ -11,8 +11,8 @@ android {
         applicationId = "dev.qcom.bandmenu"
         minSdk = 29
         targetSdk = 37
-        versionCode = 68
-        versionName = "7.0.0"
+        versionCode = 69
+        versionName = "7.0.1"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -43,7 +43,7 @@ android {
             initWith(getByName("release"))
             applicationIdSuffix = ".endcdiag"
             versionNameSuffix = "-staging"
-            manifestPlaceholders["appLabel"] = "QBM EN-DC Diagnostic"
+            manifestPlaceholders["appLabel"] = "QBM 5G Status Diagnostic"
             signingConfig = signingConfigs.getByName("debug")
             isProfileable = true
             matchingFallbacks += listOf("release")
