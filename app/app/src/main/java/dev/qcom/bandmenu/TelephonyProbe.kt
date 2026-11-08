@@ -57,7 +57,7 @@ class TelephonyProbe(context: Context) {
                         }
 
                         override fun onServiceStateChanged(serviceState: android.telephony.ServiceState) {
-                            AppLog.i(TAG, "SERVICE elapsedMs=${SystemClock.elapsedRealtime()} slot=${info.simSlotIndex} subId=$subId state=${serviceState.state} voiceRat=${serviceState.voiceNetworkType}(${ratName(serviceState.voiceNetworkType)}) dataRat=${serviceState.dataNetworkType}(${ratName(serviceState.dataNetworkType)}) roaming=${serviceState.roaming} details=$serviceState")
+                            AppLog.i(TAG, "SERVICE elapsedMs=${SystemClock.elapsedRealtime()} slot=$slot subId=$subId state=${serviceState.state} roaming=${serviceState.roaming} details=$serviceState")
                         }
                     }
                     tm.registerTelephonyCallback(appContext.mainExecutor, callback)
@@ -97,7 +97,6 @@ class TelephonyProbe(context: Context) {
         TelephonyManager.NETWORK_TYPE_UNKNOWN -> "UNKNOWN"
         TelephonyManager.NETWORK_TYPE_LTE -> "LTE"
         TelephonyManager.NETWORK_TYPE_NR -> "NR"
-        TelephonyManager.NETWORK_TYPE_LTE_CA -> "LTE_CA"
         else -> "OTHER"
     }
 
