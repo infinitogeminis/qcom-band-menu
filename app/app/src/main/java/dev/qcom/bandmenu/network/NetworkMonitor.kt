@@ -3,6 +3,7 @@ package dev.qcom.bandmenu.network
 import android.os.SystemClock
 import dev.qcom.bandmenu.AppLog
 import dev.qcom.bandmenu.DaemonManager
+import dev.qcom.bandmenu.TelephonyProbe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
