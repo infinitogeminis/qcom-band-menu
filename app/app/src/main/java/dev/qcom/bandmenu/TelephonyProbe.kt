@@ -45,13 +45,14 @@ class TelephonyProbe(context: Context) {
 
                 subscriptions.forEach { info ->
                     val subId = info.subscriptionId
+                    val slot = info.simSlotIndex
                     val tm = appContext.getSystemService(TelephonyManager::class.java).createForSubscriptionId(subId)
-                    AppLog.i(TAG, "SUB slot=${info.simSlotIndex} subId=$subId carrier=${info.carrierName} operator=${runCatching { tm.networkOperator }.getOrNull()} dataNetworkType=${runCatching { tm.dataNetworkType }.getOrNull()} serviceState=${runCatching { tm.serviceState?.toString() }.getOrNull()}")
+                    AppLog.i(TAG, "SUB slot=$slot subId=$subId carrier=${info.carrierName} operator=${runCatching { tm.networkOperator }.getOrNull()} dataNetworkType=${runCatching { tm.dataNetworkType }.getOrNull()} serviceState=${runCatching { tm.serviceState?.toString() }.getOrNull()}")
                     val callback = object : TelephonyCallback(),
                         TelephonyCallback.DisplayInfoListener,
                         TelephonyCallback.ServiceStateListener {
                         override fun onDisplayInfoChanged(info: TelephonyDisplayInfo) {
-                            AppLog.i(TAG, "DISPLAY elapsedMs=${SystemClock.elapsedRealtime()} slot=${info.simSlotIndexOrUnknown()} subId=$subId networkType=${info.networkType}(${ratName(info.networkType)}) overrideNetworkType=${info.overrideNetworkType}(${overrideName(info.overrideNetworkType)}) displayInfo=$info")
+                            AppLog.i(TAG, "DISPLAY elapsedMs=${SystemClock.elapsedRealtime()} slot=$slot subId=$subId networkType=${info.networkType}(${ratName(info.networkType)}) overrideNetworkType=${info.overrideNetworkType}(${overrideName(info.overrideNetworkType)}) displayInfo=$info")
                         }
 
                         override fun onServiceStateChanged(serviceState: android.telephony.ServiceState) {
