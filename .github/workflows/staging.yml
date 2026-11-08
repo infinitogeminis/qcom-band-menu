@@ -12,8 +12,8 @@ on:
 
 concurrency:
   group: qbm-endc-diagnostic-retry-8278c831
-  # Only one diagnostic staging build may run at a time.
-  cancel-in-progress: false
+  # Keep only the newest diagnostic build; superseded builds are cancelled.
+  cancel-in-progress: true
 
 jobs:
   staging-apk:
