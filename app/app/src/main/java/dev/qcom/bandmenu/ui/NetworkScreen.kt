@@ -502,7 +502,7 @@ fun NetworkScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "EN-DC diagnostic result — SIM $endcResultSim",
+                            "5G status diagnostic — SIM $endcResultSim",
                             style = MiuixTheme.textStyles.body1,
                             fontWeight = FontWeight.Medium
                         )
@@ -524,7 +524,7 @@ fun NetworkScreen(
                                 "COPY",
                                 modifier = Modifier.clickable {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("EN-DC QMI result", resultText))
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("QBM 5G status report", resultText))
                                     Toast.makeText(context, "Full result copied", Toast.LENGTH_SHORT).show()
                                 }.padding(horizontal = 12.dp, vertical = 8.dp),
                                 color = MiuixTheme.colorScheme.primary,
@@ -575,7 +575,7 @@ fun NetworkScreen(
                         ),
                         DropdownItem(text = stringResource(R.string.test_title), onClick = { showTestSetup = true }),
                         DropdownItem(
-                            text = "Read EN-DC config (QMI)",
+                            text = "5G status report (Android + QMI + carrier config)",
                             onClick = {
                                 endcResultSim = activeSim
                                 endcResult = "Reading QMI NAS GET_ENDC_CONFIG (0x00E8)…"
