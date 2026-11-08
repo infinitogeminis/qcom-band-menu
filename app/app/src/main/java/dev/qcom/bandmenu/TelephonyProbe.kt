@@ -9,6 +9,7 @@ import android.telephony.SubscriptionManager
 import android.telephony.TelephonyCallback
 import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
+import dev.qcom.bandmenu.network.SysInfo
 
 /**
  * Read-only Android-side view of NR registration/display state.
@@ -72,12 +73,13 @@ class TelephonyProbe(context: Context) {
 
 
     /** Log QMI's view beside Android's asynchronous telephony callbacks. */
-    fun logQmiRound(sim: Int, snapshot: dev.qcom.bandmenu.network.NetworkSnapshot) {
+    fun logQmiRound(sim: Int, snapshot: dev.qcom.bandmenu.network.NetworkSnapshot, sysInfo: SysInfo?) {
         val nrCells = snapshot.cells.filter { it.rat == dev.qcom.bandmenu.network.Rat.NR }
             .joinToString(";") { cell -> "${cell.title}[${cell.fields.joinToString(",") { "${it.label}=${it.value}" }}]" }
             .ifEmpty { "none" }
         val rrc = snapshot.rrc.joinToString(";") { "${it.label}=${it.value}" }.ifEmpty { "none" }
-        AppLog.i(TAG, "QMI_ROUND elapsedMs=${SystemClock.elapsedRealtime()} sim=$sim mode=${snapshot.mode} modeLabel=${snapshot.modeLabel} NR_cells=$nrCells RRC=$rrc roundMs=${snapshot.roundMs}")
+        val nrStatus = sysInfo?.status?.entries?.joinToString(";") { "${it.key}=${it.value.status}/${it.value.trueStatus}" } ?: "unavailable"
+        AppLog.i(TAG, "QMI_ROUND elapsedMs=${SystemClock.elapsedRealtime()} sim=$sim mode=${snapshot.mode} modeLabel=${snapshot.modeLabel} NR_status=$nrStatus ENDC_available=${sysInfo?.endcAvailable} DCNR_restricted=${sysInfo?.dcnrRestricted} NR_ARFCN=${sysInfo?.nrArfcn} NR_PCI=${sysInfo?.nrPci} NR_NCI=${sysInfo?.nrNci} NR_cells=$nrCells RRC=$rrc roundMs=${snapshot.roundMs}")
     }
 
     fun stop() {
