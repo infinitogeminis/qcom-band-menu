@@ -41,7 +41,7 @@ android {
         // (own package and label) and is signed with the local debug key.
         create("staging") {
             initWith(getByName("release"))
-            applicationIdSuffix = ".endcdiag"
+            applicationIdSuffix = ".5gdiag"
             versionNameSuffix = "-staging"
             manifestPlaceholders["appLabel"] = "QBM 5G Status Diagnostic"
             signingConfig = signingConfigs.getByName("debug")
