@@ -69,11 +69,11 @@ class MainActivity : ComponentActivity() {
     // killing and relaunching it. Stopped in DaemonHolder.onCleared().
     private val daemonHolder by lazy {
         ViewModelProvider(this, viewModelFactory {
-            initializer { DaemonHolder(DaemonManager(applicationContext), DiagClient(applicationContext), java.io.File(cacheDir, "netreplay")) }
+            initializer { DaemonHolder(DaemonManager(applicationContext), DiagClient(applicationContext), java.io.File(cacheDir, "netreplay"), applicationContext) }
         })[DaemonHolder::class.java]
     }
     private val daemonManager get() = daemonHolder.daemonManager
-    private val telephonyProbe by lazy { TelephonyProbe(applicationContext) }
+    private val telephonyProbe get() = daemonHolder.telephonyProbe
 
     /** Transparent bars with icons that suit the theme: dark icons on the
      *  light theme, light ones on the dark (whatever the phone's own mode). */
