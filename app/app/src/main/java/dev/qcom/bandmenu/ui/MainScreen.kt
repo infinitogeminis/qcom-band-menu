@@ -2,6 +2,7 @@ package dev.qcom.bandmenu.ui
 
 import androidx.compose.ui.res.stringResource
 import dev.qcom.bandmenu.DisplayScale
+import dev.qcom.bandmenu.TelephonyProbe
 import dev.qcom.bandmenu.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -59,6 +60,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun MainScreen(
     networkMonitor: dev.qcom.bandmenu.network.NetworkMonitor,
+    telephonyProbe: TelephonyProbe,
     /** Network page pull-to-refresh (the page also takes a new reading itself). */
     onNetworkRefresh: () -> Unit = {},
     /** Network page menu: replay on or off (persisted by the caller). */
@@ -230,6 +232,7 @@ fun MainScreen(
                     when (page) {
                         0 -> NetworkScreen(
                             monitor = networkMonitor,
+                            telephonyProbe = telephonyProbe,
                             isActive = pagerState.settledPage == 0,
                             simLabels = simLabels,
                             sim2Available = modemState?.sim2Available != false,
