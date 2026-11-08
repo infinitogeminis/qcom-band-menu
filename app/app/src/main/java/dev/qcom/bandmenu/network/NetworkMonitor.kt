@@ -267,7 +267,8 @@ class NetworkMonitor(
         }
         val snap = pucchHold[sim - 1].apply(portHold[sim - 1].apply(SnapshotBuilder(reads, nrHardwareBands, diagStats, diagMode = withDiag)
             .build(sim, SystemClock.elapsedRealtime(), (SystemClock.elapsedRealtime() - t0).toInt())))
-        telephonyProbe?.logQmiRound(sim, snap)
+        val qmiSysInfo = (reads[NetworkReads.SYS] as? ReadOutcome.Ok)?.let { runCatching { decodeSysInfo(it.frame) }.getOrNull() }
+        telephonyProbe?.logQmiRound(sim, snap, qmiSysInfo)
         // Slow tier: operator name only when the PLMN changes.
         val plmn = snap.plmn
         val key = plmn?.let { "$it/${snap.mode}" }
